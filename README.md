@@ -98,7 +98,6 @@ Once the server starts, open your browser and go to: http://127.0.0.1:5000/
 View the detection result displayed on the screen.
 
 ## 🖼️ Demo Screenshots
-Add these images to a folder like screenshots/ in the repository and update paths if needed.
 
 1️⃣ Lung Cancer Image Upload
 ![](./screenshots/HF-lung-demo1.png)
@@ -113,10 +112,9 @@ Add these images to a folder like screenshots/ in the repository and update path
 ![](./screenshots/HF-colon-demo2.png)
 
 ## 📄 Research Paper
-This software implementation is based on the research paper included in the repository:
+This software implementation is based on the research paper authored by Anush Kar and Yash Thakker included in the repository:
 
-📘 Speech Emotion Recognition Using LSTM Architecture
-(Adapted and extended for medical image classification use cases)
+📘 Lung Cancer Detection Using a Deep Learning Approach
 
 The paper explains the theoretical background, model architecture, dataset handling, and evaluation metrics used as the foundation for this project.
 
