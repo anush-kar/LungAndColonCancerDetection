@@ -1,0 +1,10 @@
+datasets
+transformers
+tensorboard
+evaluate
+torch
+torchvision
+torchaudio
+flask
+pillow
+werkzeug
