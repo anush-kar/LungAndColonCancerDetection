@@ -102,6 +102,7 @@ Add these images to a folder like screenshots/ in the repository and update path
 
 1️⃣ Lung Cancer Image Upload
 ![](screenshots\HF-lung-demo1.png)
+
 2️⃣ Lung Cancer Detection Result
 ![](screenshots\HF-lung-demo2.png)
 
