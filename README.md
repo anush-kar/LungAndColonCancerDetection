@@ -101,16 +101,16 @@ View the detection result displayed on the screen.
 Add these images to a folder like screenshots/ in the repository and update paths if needed.
 
 1️⃣ Lung Cancer Image Upload
-![](screenshots\HF-lung-demo1.png)
+![](./screenshots/HF-lung-demo1.png)
 
 2️⃣ Lung Cancer Detection Result
-![](screenshots\HF-lung-demo2.png)
+![](./screenshots/HF-lung-demo2.png)
 
 3️⃣ Colon Cancer Image Upload
-![](screenshots\HF-colon-demo1.png)
+![](./screenshots/HF-colon-demo1.png)
 
 4️⃣ Colon Cancer Detection Result
-![](screenshots\HF-colon-demo2.png)
+![](./screenshots/HF-colon-demo2.png)
 
 ## 📄 Research Paper
 This software implementation is based on the research paper included in the repository:
