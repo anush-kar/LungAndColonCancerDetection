@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lung & Colon Cancer Detection</title>
+    <title>Lung Cancer Detection</title>
     <style>
         * {
             margin: 0;
@@ -263,12 +263,21 @@
             margin-top: 20px;
             display: none;
         }
+        #output {
+            max-width: 100%;
+            max-height: 200px;
+            margin-top: 10px;
+            /* Optional: Add some basic styling */
+            border: 1px solid #ccc;
+            display: none; /* Hide until an image is loaded */
+            align-self: center;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🔬 Cancer Detection System</h1>
-        <p class="subtitle">AI-Powered Lung & Colon Cancer Analysis</p>
+        <p class="subtitle">AI-Powered Lung Cancer Analysis</p>
 
         <form id="predictionForm">
             <div class="section">
@@ -278,19 +287,12 @@
                         <input type="radio" id="lung" name="cancer_type" value="lung">
                         <label for="lung">🫁 Lung Cancer</label>
                     </div>
-                    <div class="radio-option">
-                        <input type="radio" id="colon" name="cancer_type" value="colon">
-                        <label for="colon">🔬 Colon Cancer</label>
-                    </div>
-                    <div class="radio-option">
-                        <input type="radio" id="both" name="cancer_type" value="both" checked>
-                        <label for="both">📊 Both</label>
-                    </div>
                 </div>
             </div>
 
             <div class="section">
                 <label>Upload CT Scan Image:</label>
+                
                 <div class="upload-area" id="uploadArea">
                     <div class="upload-icon">📤</div>
                     <div class="upload-text">
@@ -299,9 +301,32 @@
                     <div class="upload-text" style="font-size: 12px; color: #999;">
                         PNG, JPG, JPEG, BMP, TIFF (Max 16MB)
                     </div>
-                    <input type="file" id="fileInput" name="file" accept=".png,.jpg,.jpeg,.bmp,.tiff">
+                    <input type="file" id="fileInput" name="file" accept=".png,.jpg,.jpeg,.bmp,.tiff" onchange="loadFile(event)">
                     <div class="file-name" id="fileName"></div>
                 </div>
+                <div id="imagePreview" style="display: flex; justify-content: center; margin-top: 15px;">
+                    <img id="output" alt="Uploaded Image Preview">
+                </div>
+
+                <script>
+                    // JavaScript function to handle the file selection and display the image
+                    var loadFile = function(event) {
+                        // Get the image element where the preview will be displayed
+                        var image = document.getElementById('output');
+                        
+                        // Set the source of the image element to a URL created from the selected file
+                        image.src = URL.createObjectURL(event.target.files[0]);
+                        
+                        // Make the image visible
+                        image.style.display = 'block'; 
+                        
+                        // Optional: revoke the object URL when the image has loaded to free up memory
+                        image.onload = function() {
+                            URL.revokeObjectURL(image.src); 
+                        }
+                    };
+                </script>
+
             </div>
 
             <button type="submit" class="btn" id="submitBtn" disabled>
