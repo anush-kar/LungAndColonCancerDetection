@@ -1,0 +1,72 @@
+@startuml LungAndColonCancerDetection_System_Diagram
+!theme blueprint
+skinparam backgroundColor #FAFAFA
+skinparam defaultFontSize 12
+skinparam defaultFontColor #000
+skinparam arrowColor #000
+skinparam component {
+    BackgroundColor #FAFAFA
+    BorderColor #000
+}
+skinparam database {
+    BorderColor #fff
+    FontColor #fff
+}
+skinparam note{
+    FontColor #fff
+}
+
+
+' Actor
+actor "User" as user #blue
+
+' Main Components 
+package "Frontend Interface" #lightblue {
+  component "Image Upload" as upload
+  component "Image Preview" as preview
+  component "Analyze Button" as analyze
+  component "Results Display" as results
+}
+
+package "Backend Processing Pipeline" #lightgreen {
+  component "Image Preprocessing" as preprocess
+  component "Deep Learning Model" as model
+  database "Classification Model\n(SCC, Adeno, Normal)" as db_model
+}
+
+package "Under Development" #yellow {
+  component "Microplastics\nCorrelation" as microplastics
+  database "Air Quality\nDataset" as air_db
+}
+
+' Notes
+note right of model
+**Implemented**
+3-class classification:
+• Squamous Cell Carcinoma  
+• Adenocarcinoma  
+• Normal Lung
+end note
+
+' User interactions
+user --> upload : Upload CT Scan
+upload --> preview : Image Preview
+preview --> analyze : Click Analyze
+analyze --> preprocess : Trigger Processing
+
+' Processing pipeline
+preprocess --> model : Preprocessed Image
+model --> db_model : Inference
+db_model --> results : Classification Results
+
+' Microplastics integration (future)
+model ..> microplastics : Air Quality Context
+microplastics --> air_db : Correlation Analysis
+air_db ..> results : Enhanced Risk Score
+
+' Status indicators
+note top of "Frontend Interface" : **✅ Implemented**
+note top of "Backend Processing Pipeline" : **✅ Implemented**
+note top of "Under Development" : **🔄 In Progress**
+
+@enduml
