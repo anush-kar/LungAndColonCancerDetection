@@ -4,275 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lung Cancer Detection</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-
-        .container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 600px;
-            width: 100%;
-            padding: 40px;
-        }
-
-        h1 {
-            color: #333;
-            text-align: center;
-            margin-bottom: 10px;
-            font-size: 28px;
-        }
-
-        .subtitle {
-            text-align: center;
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
-
-        .section {
-            margin-bottom: 25px;
-        }
-
-        label {
-            display: block;
-            color: #333;
-            font-weight: 600;
-            margin-bottom: 10px;
-            font-size: 16px;
-        }
-
-        .radio-group {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .radio-option {
-            flex: 1;
-            position: relative;
-        }
-
-        .radio-option input[type="radio"] {
-            position: absolute;
-            opacity: 0;
-        }
-
-        .radio-option label {
-            display: block;
-            padding: 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 500;
-            margin: 0;
-        }
-
-        .radio-option input[type="radio"]:checked + label {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-color: #667eea;
-        }
-
-        .radio-option label:hover {
-            border-color: #667eea;
-            transform: translateY(-2px);
-        }
-
-        .upload-area {
-            border: 3px dashed #d0d0d0;
-            border-radius: 15px;
-            padding: 40px 20px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: #f9f9f9;
-        }
-
-        .upload-area:hover {
-            border-color: #667eea;
-            background: #f0f4ff;
-        }
-
-        .upload-area.dragover {
-            border-color: #667eea;
-            background: #e8edff;
-        }
-
-        .upload-icon {
-            font-size: 48px;
-            margin-bottom: 10px;
-            color: #667eea;
-        }
-
-        .upload-text {
-            color: #666;
-            margin-bottom: 10px;
-        }
-
-        .file-name {
-            margin-top: 15px;
-            padding: 10px;
-            background: #e8edff;
-            border-radius: 8px;
-            color: #667eea;
-            font-weight: 600;
-            display: none;
-        }
-
-        input[type="file"] {
-            display: none;
-        }
-
-        .btn {
-            width: 100%;
-            padding: 15px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin-top: 20px;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .results {
-            margin-top: 30px;
-            display: none;
-        }
-
-        .result-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 25px;
-            border-radius: 15px;
-            color: white;
-            margin-bottom: 20px;
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
-        }
-
-        .result-title {
-            font-size: 14px;
-            opacity: 0.9;
-            margin-bottom: 5px;
-        }
-
-        .result-label {
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: 10px;
-        }
-
-        .result-score {
-            font-size: 32px;
-            font-weight: 700;
-        }
-
-        .all-results {
-            background: #f9f9f9;
-            padding: 20px;
-            border-radius: 15px;
-        }
-
-        .all-results h3 {
-            color: #333;
-            margin-bottom: 15px;
-            font-size: 18px;
-        }
-
-        .result-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 15px;
-            background: white;
-            border-radius: 10px;
-            margin-bottom: 10px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        .result-item:last-child {
-            margin-bottom: 0;
-        }
-
-        .result-item-label {
-            color: #333;
-            font-weight: 600;
-        }
-
-        .result-item-score {
-            color: #667eea;
-            font-weight: 700;
-            font-size: 18px;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 20px;
-            display: none;
-        }
-
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 15px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .error {
-            background: #ff4757;
-            color: white;
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 20px;
-            display: none;
-        }
-        #output {
-            max-width: 100%;
-            max-height: 200px;
-            margin-top: 10px;
-            /* Optional: Add some basic styling */
-            border: 1px solid #ccc;
-            display: none; /* Hide until an image is loaded */
-            align-self: center;
-        }
-    </style>
+    <script src="cities.js"></script>
+    <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body>
     <div class="container">
@@ -353,6 +86,28 @@
                 <div id="allResults"></div>
             </div>
         </div>
+        <div class="section" style="margin-top: 20px;">
+            <label>Select your Location</label>
+            <div id="city_dropdowns">
+                <select onchange="print_city('state', this.selectedIndex);" id="sts" name ="stt" class="form-control" required></select>
+                <select id ="state" class="form-control" required></select>
+                <script language="javascript">print_state("sts");</script>
+            </div>
+        </div>
+
+        <div class="aqi-container">
+            <div class="aqi-title">🌫️ Air Quality by Locality (WAQI)</div>
+            <button type="button" class="btn" id="fetchAqiBtn" style="margin-top:0;">Fetch Air Quality</button>
+            <div class="loading" id="aqiLoading" style="display:none; padding:12px 0 0 0;">
+                <p>Fetching air quality data...</p>
+            </div>
+            <div class="error" id="aqiError" style="display:none;"></div>
+            <div id="aqiResults" style="display:none; margin-top:14px;">
+                <div class="aqi-meta" id="aqiMeta"></div>
+                <div class="aqi-grid" id="aqiGrid"></div>
+                <pre class="aqi-json" id="aqiJson"></pre>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -364,6 +119,13 @@
         const loading = document.getElementById('loading');
         const results = document.getElementById('results');
         const error = document.getElementById('error');
+        const fetchAqiBtn = document.getElementById('fetchAqiBtn');
+        const aqiLoading = document.getElementById('aqiLoading');
+        const aqiError = document.getElementById('aqiError');
+        const aqiResults = document.getElementById('aqiResults');
+        const aqiMeta = document.getElementById('aqiMeta');
+        const aqiGrid = document.getElementById('aqiGrid');
+        const aqiJson = document.getElementById('aqiJson');
 
         // Click to upload
         uploadArea.addEventListener('click', () => fileInput.click());
@@ -450,6 +212,75 @@
             } finally {
                 loading.style.display = 'none';
                 submitBtn.disabled = false;
+            }
+        });
+
+        function addAqiItem(label, value) {
+            const item = document.createElement('div');
+            item.className = 'aqi-chip';
+            item.innerHTML = `
+                <div class="aqi-chip-label">${label}</div>
+                <div class="aqi-chip-value">${value ?? 'N/A'}</div>
+            `;
+            aqiGrid.appendChild(item);
+        }
+
+        fetchAqiBtn.addEventListener('click', async () => {
+            const stateSelect = document.getElementById('sts');
+            const citySelect = document.getElementById('state');
+            const selectedCity = citySelect.value ? citySelect.value.trim() : '';
+            const selectedState = stateSelect.value ? stateSelect.value.trim() : '';
+
+            aqiError.style.display = 'none';
+            aqiResults.style.display = 'none';
+            aqiGrid.innerHTML = '';
+
+            if (!selectedCity) {
+                aqiError.textContent = 'Please select a city/locality first.';
+                aqiError.style.display = 'block';
+                return;
+            }
+
+            aqiLoading.style.display = 'block';
+            fetchAqiBtn.disabled = true;
+
+            try {
+                const response = await fetch(`/api/air-quality?city=${encodeURIComponent(selectedCity)}`);
+                const payload = await response.json();
+
+                if (!response.ok || !payload.success) {
+                    throw new Error(payload.error || 'Unable to fetch air quality data.');
+                }
+
+                const data = payload.data || {};
+                const iaqi = data.iaqi || {};
+
+                aqiMeta.innerHTML = `
+                    <strong>Location:</strong> ${data.city?.name || selectedCity}, ${selectedState || 'N/A'}<br>
+                    <strong>Updated:</strong> ${data.time?.s || 'N/A'}<br>
+                    <strong>Primary Pollutant:</strong> ${data.dominentpol || 'N/A'}
+                `;
+
+                addAqiItem('AQI', data.aqi);
+                addAqiItem('PM2.5', iaqi.pm25?.v);
+                addAqiItem('PM10', iaqi.pm10?.v);
+                addAqiItem('O3', iaqi.o3?.v);
+                addAqiItem('NO2', iaqi.no2?.v);
+                addAqiItem('SO2', iaqi.so2?.v);
+                addAqiItem('CO', iaqi.co?.v);
+                addAqiItem('Temperature', iaqi.t?.v);
+                addAqiItem('Humidity', iaqi.h?.v);
+                addAqiItem('Pressure', iaqi.p?.v);
+                addAqiItem('Wind', iaqi.w?.v);
+
+                aqiJson.textContent = JSON.stringify(data, null, 2);
+                aqiResults.style.display = 'block';
+            } catch (err) {
+                aqiError.textContent = `Error: ${err.message}`;
+                aqiError.style.display = 'block';
+            } finally {
+                aqiLoading.style.display = 'none';
+                fetchAqiBtn.disabled = false;
             }
         });
     </script>

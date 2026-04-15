@@ -5,12 +5,20 @@
 
 # print(response)
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from transformers import pipeline
 from PIL import Image
 import os
+import json
+from urllib.parse import quote
+from urllib.request import urlopen
+from urllib.error import URLError, HTTPError
 from werkzeug.utils import secure_filename
 import torch
+from dotenv import load_dotenv
+
+load_dotenv()
+WAQI_API_TOKEN = os.getenv('WAQI_API_KEY')
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
@@ -46,6 +54,39 @@ def format_label(label):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/cities.js')
+def cities_js():
+    return send_from_directory('templates', 'cities.js')
+
+@app.route('/style.css')
+def style_css():
+    return send_from_directory('templates', 'style.css')
+
+@app.route('/api/air-quality', methods=['GET'])
+def get_air_quality():
+    city = request.args.get('city', '').strip()
+    if not city:
+        return jsonify({'error': 'City is required'}), 400
+
+    token = os.environ.get('WAQI_API_TOKEN', 'demo')
+    waqi_url = f"https://api.waqi.info/feed/{quote(city)}/?token={WAQI_API_TOKEN}"
+
+    try:
+        with urlopen(waqi_url, timeout=10) as response:
+            payload = json.loads(response.read().decode('utf-8'))
+
+        if payload.get('status') != 'ok':
+            return jsonify({
+                'error': payload.get('data', 'Unable to fetch air quality data from WAQI')
+            }), 400
+
+        return jsonify({'success': True, 'data': payload.get('data', {})})
+
+    except (HTTPError, URLError):
+        return jsonify({'error': 'Failed to connect to WAQI API'}), 502
+    except Exception as e:
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
 
 @app.route('/predict', methods=['POST'])
 def predict():
