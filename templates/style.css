@@ -338,3 +338,83 @@ input[type="file"] {
   overflow: auto;
   font-size: 12px;
 }
+
+.micro-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.micro-controls .form-control {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}
+
+.micro-action-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.micro-action-row .btn {
+  margin-top: 0;
+}
+
+.micro-chart-wrap {
+  margin-top: 12px;
+  background: #ffffff;
+  border: 1px solid #eaeaea;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+#microCorrelationChart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.patient-risk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.patient-field label {
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.patient-input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+}
+
+.patient-input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.12);
+}
+
+.patient-help-text {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid #e8e8f5;
+  border-radius: 8px;
+  background: #f7f8ff;
+  color: #444;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.patient-help-text ul {
+  margin: 6px 0 0 16px;
+  padding: 0;
+}

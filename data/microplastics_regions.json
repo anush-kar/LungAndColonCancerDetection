@@ -1,0 +1,112 @@
+[
+  {
+    "region": "Delhi",
+    "year": 2025,
+    "microplastics_air": 42.5,
+    "pm25": 97.2,
+    "pm10": 184.1,
+    "lung_aca_incidence": 48.3,
+    "lung_scc_incidence": 33.7,
+    "population": 32900000,
+    "source": "Demo atmospheric + epidemiology baseline"
+  },
+  {
+    "region": "Mumbai",
+    "year": 2025,
+    "microplastics_air": 31.8,
+    "pm25": 61.9,
+    "pm10": 132.7,
+    "lung_aca_incidence": 39.6,
+    "lung_scc_incidence": 27.1,
+    "population": 20600000,
+    "source": "Demo atmospheric + epidemiology baseline"
+  },
+  {
+    "region": "Kolkata",
+    "year": 2025,
+    "microplastics_air": 36.9,
+    "pm25": 74.8,
+    "pm10": 149.3,
+    "lung_aca_incidence": 42.8,
+    "lung_scc_incidence": 29.2,
+    "population": 15100000,
+    "source": "Demo atmospheric + epidemiology baseline"
+  },
+  {
+    "region": "Chennai",
+    "year": 2025,
+    "microplastics_air": 24.7,
+    "pm25": 42.1,
+    "pm10": 98.4,
+    "lung_aca_incidence": 32.4,
+    "lung_scc_incidence": 21.8,
+    "population": 11300000,
+    "source": "Demo atmospheric + epidemiology baseline"
+  },
+  {
+    "region": "Bengaluru",
+    "year": 2025,
+    "microplastics_air": 22.3,
+    "pm25": 36.7,
+    "pm10": 84.1,
+    "lung_aca_incidence": 29.7,
+    "lung_scc_incidence": 19.4,
+    "population": 14000000,
+    "source": "Demo atmospheric + epidemiology baseline"
+  },
+  {
+    "region": "Hyderabad",
+    "year": 2025,
+    "microplastics_air": 26.9,
+    "pm25": 48.5,
+    "pm10": 103.8,
+    "lung_aca_incidence": 34.2,
+    "lung_scc_incidence": 23.5,
+    "population": 10900000,
+    "source": "Demo atmospheric + epidemiology baseline"
+  },
+  {
+    "region": "Pune",
+    "year": 2025,
+    "microplastics_air": 19.6,
+    "pm25": 31.4,
+    "pm10": 72.2,
+    "lung_aca_incidence": 26.8,
+    "lung_scc_incidence": 17.9,
+    "population": 7600000,
+    "source": "Demo atmospheric + epidemiology baseline"
+  },
+  {
+    "region": "Ahmedabad",
+    "year": 2025,
+    "microplastics_air": 28.4,
+    "pm25": 53.3,
+    "pm10": 118.5,
+    "lung_aca_incidence": 35.7,
+    "lung_scc_incidence": 24.8,
+    "population": 8300000,
+    "source": "Demo atmospheric + epidemiology baseline"
+  },
+  {
+    "region": "Lucknow",
+    "year": 2025,
+    "microplastics_air": 34.1,
+    "pm25": 82.6,
+    "pm10": 168.2,
+    "lung_aca_incidence": 44.1,
+    "lung_scc_incidence": 31.5,
+    "population": 4100000,
+    "source": "Demo atmospheric + epidemiology baseline"
+  },
+  {
+    "region": "Jaipur",
+    "year": 2025,
+    "microplastics_air": 27.2,
+    "pm25": 57.9,
+    "pm10": 124.9,
+    "lung_aca_incidence": 36.8,
+    "lung_scc_incidence": 25.9,
+    "population": 4100000,
+    "source": "Demo atmospheric + epidemiology baseline"
+  }
+]

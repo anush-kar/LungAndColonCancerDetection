@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lung Cancer Detection</title>
-    <script src="cities.js"></script>
     <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body>
@@ -87,16 +86,16 @@
             </div>
         </div>
         <div class="section" style="margin-top: 20px;">
-            <label>Select your Location</label>
+            <label for="stationSelect">Station Name</label>
             <div id="city_dropdowns">
-                <select onchange="print_city('state', this.selectedIndex);" id="sts" name ="stt" class="form-control" required></select>
-                <select id ="state" class="form-control" required></select>
-                <script language="javascript">print_state("sts");</script>
+                <select id="stationSelect" class="form-control" required>
+                    <option value="">Loading stations...</option>
+                </select>
             </div>
         </div>
 
         <div class="aqi-container">
-            <div class="aqi-title">🌫️ Air Quality by Locality (WAQI)</div>
+            <div class="aqi-title">🌫️ Air Quality by Locality (Powered by World Air Quality Index)</div>
             <button type="button" class="btn" id="fetchAqiBtn" style="margin-top:0;">Fetch Air Quality</button>
             <div class="loading" id="aqiLoading" style="display:none; padding:12px 0 0 0;">
                 <p>Fetching air quality data...</p>
@@ -106,6 +105,124 @@
                 <div class="aqi-meta" id="aqiMeta"></div>
                 <div class="aqi-grid" id="aqiGrid"></div>
                 <pre class="aqi-json" id="aqiJson"></pre>
+            </div>
+        </div>
+
+        <div class="aqi-container" id="microplasticsSection">
+            <div class="aqi-title">🧪 Microplastics Correlation Analysis</div>
+            <div class="micro-controls">
+                <select id="microCancerType" class="form-control">
+                    <option value="combined">Combined Lung Incidence</option>
+                    <option value="lung_aca">Lung Adenocarcinoma (ACA)</option>
+                    <option value="lung_scc">Lung Squamous Cell Carcinoma (SCC)</option>
+                </select>
+                <select id="microMethod" class="form-control">
+                    <option value="pearson">Pearson correlation</option>
+                    <option value="spearman">Spearman correlation</option>
+                </select>
+            </div>
+
+            <div class="micro-action-row">
+                <button type="button" class="btn" id="fetchExposureBtn">Load Region Exposure</button>
+                <button type="button" class="btn" id="runCorrelationBtn">Run Epidemiological Correlation</button>
+                <button type="button" class="btn" id="runEnhancedRiskBtn">Compute Enhanced Risk</button>
+            </div>
+
+            <div class="error" id="microError" style="display:none;"></div>
+
+            <div id="microExposure" style="display:none; margin-top:12px;">
+                <div class="aqi-meta"><strong>Regional Exposure Baseline</strong></div>
+                <div class="aqi-grid" id="microExposureGrid"></div>
+            </div>
+
+            <div id="microCorrelation" style="display:none; margin-top:12px;">
+                <div class="aqi-meta"><strong>Correlation Output</strong></div>
+                <div class="result-item">
+                    <div id="microCorrelationMeta"></div>
+                </div>
+                <div class="micro-chart-wrap">
+                    <canvas id="microCorrelationChart" width="520" height="300"></canvas>
+                </div>
+            </div>
+
+            <div id="microRisk" style="display:none; margin-top:12px;">
+                <div class="aqi-meta"><strong>Enhanced Risk (Image + Environment)</strong></div>
+                <div class="result-item">
+                    <div id="microRiskMeta"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="aqi-container" id="patientRiskSection">
+            <div class="aqi-title">🩺 Patient Lung Cancer Risk (6 Inputs)</div>
+            <p class="subtitle" style="margin-bottom:12px; text-align:left;">
+                Enter patient factors to predict <strong>Level</strong> and numeric <strong>Risk %</strong>.
+            </p>
+
+            <div class="patient-risk-grid">
+                <div class="patient-field">
+                    <label for="riskModel">Prediction Model</label>
+                    <select id="riskModel" class="patient-input">
+                        <option value="random_forest" selected>Random Forest</option>
+                        <option value="logistic_regression">Logistic Regression</option>
+                    </select>
+                    <div class="patient-help-text">
+                        <strong>Model guide:</strong>
+                        <ul>
+                            <li><strong>Random Forest</strong> → usually better raw predictive performance on nonlinear patterns.</li>
+                            <li><strong>Logistic Regression</strong> → simpler and easier to interpret feature influence.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="patient-field">
+                    <label for="riskAge">Age</label>
+                    <input id="riskAge" type="number" min="1" max="120" placeholder="e.g. 46" class="patient-input" />
+                </div>
+
+                <div class="patient-field">
+                    <label for="riskGender">Gender</label>
+                    <select id="riskGender" class="patient-input">
+                        <option value="">Select</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                    </select>
+                </div>
+
+                <div class="patient-field">
+                    <label for="riskAirPollution">Air Pollution</label>
+                    <input id="riskAirPollution" type="number" min="1" max="8" placeholder="1-8" class="patient-input" />
+                </div>
+
+                <div class="patient-field">
+                    <label for="riskDustAllergy">Dust Allergy</label>
+                    <input id="riskDustAllergy" type="number" min="1" max="8" placeholder="1-8" class="patient-input" />
+                </div>
+
+                <div class="patient-field">
+                    <label for="riskSmoking">Smoking</label>
+                    <input id="riskSmoking" type="number" min="1" max="8" placeholder="1-8" class="patient-input" />
+                </div>
+
+                <div class="patient-field">
+                    <label for="riskPassiveSmoker">Passive Smoker</label>
+                    <input id="riskPassiveSmoker" type="number" min="1" max="8" placeholder="1-8" class="patient-input" />
+                </div>
+            </div>
+
+            <button type="button" class="btn" id="runPatientRiskBtn">Predict Patient Risk</button>
+
+            <div class="loading" id="patientRiskLoading" style="display:none; padding:12px 0 0 0;">
+                <p>Calculating patient risk...</p>
+            </div>
+
+            <div class="error" id="patientRiskError" style="display:none;"></div>
+
+            <div id="patientRiskResults" style="display:none; margin-top:12px;">
+                <div class="result-item">
+                    <div id="patientRiskMeta"></div>
+                </div>
+                <div id="patientRiskProbabilities" style="margin-top:10px;"></div>
             </div>
         </div>
     </div>
@@ -126,6 +243,14 @@
         const aqiMeta = document.getElementById('aqiMeta');
         const aqiGrid = document.getElementById('aqiGrid');
         const aqiJson = document.getElementById('aqiJson');
+        const stationSelect = document.getElementById('stationSelect');
+        const runPatientRiskBtn = document.getElementById('runPatientRiskBtn');
+        const patientRiskLoading = document.getElementById('patientRiskLoading');
+        const patientRiskError = document.getElementById('patientRiskError');
+        const patientRiskResults = document.getElementById('patientRiskResults');
+        const patientRiskMeta = document.getElementById('patientRiskMeta');
+        const patientRiskProbabilities = document.getElementById('patientRiskProbabilities');
+        window.latestImagePrediction = null;
 
         // Click to upload
         uploadArea.addEventListener('click', () => fileInput.click());
@@ -188,6 +313,7 @@
                     // Display results
                     document.getElementById('topLabel').textContent = data.top_prediction.label;
                     document.getElementById('topScore').textContent = `${data.top_prediction.score}%`;
+                    window.latestImagePrediction = data.top_prediction;
 
                     const allResultsDiv = document.getElementById('allResults');
                     allResultsDiv.innerHTML = '';
@@ -225,18 +351,42 @@
             aqiGrid.appendChild(item);
         }
 
+        async function loadStations() {
+            try {
+                const response = await fetch('/api/waqi-stations');
+                const payload = await response.json();
+
+                if (!response.ok || !payload.success) {
+                    throw new Error(payload.error || 'Unable to load station list.');
+                }
+
+                const stations = payload.data?.stations || [];
+                stationSelect.innerHTML = '<option value="">Select Station Name</option>';
+
+                stations.forEach((station) => {
+                    const option = document.createElement('option');
+                    option.value = station;
+                    option.textContent = station;
+                    stationSelect.appendChild(option);
+                });
+            } catch (err) {
+                stationSelect.innerHTML = '<option value="">Failed to load stations</option>';
+                aqiError.textContent = `Error: ${err.message}`;
+                aqiError.style.display = 'block';
+            }
+        }
+
+        loadStations();
+
         fetchAqiBtn.addEventListener('click', async () => {
-            const stateSelect = document.getElementById('sts');
-            const citySelect = document.getElementById('state');
-            const selectedCity = citySelect.value ? citySelect.value.trim() : '';
-            const selectedState = stateSelect.value ? stateSelect.value.trim() : '';
+            const selectedStation = stationSelect.value ? stationSelect.value.trim() : '';
 
             aqiError.style.display = 'none';
             aqiResults.style.display = 'none';
             aqiGrid.innerHTML = '';
 
-            if (!selectedCity) {
-                aqiError.textContent = 'Please select a city/locality first.';
+            if (!selectedStation) {
+                aqiError.textContent = 'Please select a station first.';
                 aqiError.style.display = 'block';
                 return;
             }
@@ -245,7 +395,7 @@
             fetchAqiBtn.disabled = true;
 
             try {
-                const response = await fetch(`/api/air-quality?city=${encodeURIComponent(selectedCity)}`);
+                const response = await fetch(`/api/air-quality?station=${encodeURIComponent(selectedStation)}`);
                 const payload = await response.json();
 
                 if (!response.ok || !payload.success) {
@@ -256,7 +406,8 @@
                 const iaqi = data.iaqi || {};
 
                 aqiMeta.innerHTML = `
-                    <strong>Location:</strong> ${data.city?.name || selectedCity}, ${selectedState || 'N/A'}<br>
+                    <strong>Station:</strong> ${selectedStation}<br>
+                    <strong>Location:</strong> ${data.city?.name || 'N/A'}<br>
                     <strong>Updated:</strong> ${data.time?.s || 'N/A'}<br>
                     <strong>Primary Pollutant:</strong> ${data.dominentpol || 'N/A'}
                 `;
@@ -283,6 +434,78 @@
                 fetchAqiBtn.disabled = false;
             }
         });
+
+        function getPatientRiskPayload() {
+            return {
+                model_name: document.getElementById('riskModel').value,
+                Age: document.getElementById('riskAge').value,
+                Gender: document.getElementById('riskGender').value,
+                'Air Pollution': document.getElementById('riskAirPollution').value,
+                'Dust Allergy': document.getElementById('riskDustAllergy').value,
+                Smoking: document.getElementById('riskSmoking').value,
+                'Passive Smoker': document.getElementById('riskPassiveSmoker').value,
+            };
+        }
+
+        runPatientRiskBtn.addEventListener('click', async () => {
+            patientRiskError.style.display = 'none';
+            patientRiskResults.style.display = 'none';
+            patientRiskProbabilities.innerHTML = '';
+
+            const payload = getPatientRiskPayload();
+            const emptyFields = Object.entries(payload)
+                .filter(([key, value]) => key !== 'model_name' && (value === '' || value == null))
+                .map(([key]) => key);
+
+            if (emptyFields.length > 0) {
+                patientRiskError.textContent = `Please fill all fields: ${emptyFields.join(', ')}`;
+                patientRiskError.style.display = 'block';
+                return;
+            }
+
+            patientRiskLoading.style.display = 'block';
+            runPatientRiskBtn.disabled = true;
+
+            try {
+                const response = await fetch('/api/risk/patient-likelihood', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+
+                const apiPayload = await response.json();
+                if (!response.ok || !apiPayload.success) {
+                    throw new Error(apiPayload.error || 'Patient risk prediction failed.');
+                }
+
+                const data = apiPayload.data;
+                patientRiskMeta.innerHTML = `
+                    <strong>Predicted Level:</strong> ${data.predicted_level}<br>
+                    <strong>Risk Percentage:</strong> ${data.risk_percent ?? 'N/A'}%<br>
+                    <strong>Model:</strong> ${data.model_name || 'N/A'}
+                `;
+
+                const probs = data.class_probabilities || {};
+                Object.keys(probs).forEach((cls) => {
+                    const item = document.createElement('div');
+                    item.className = 'result-item';
+                    item.innerHTML = `
+                        <span class="result-item-label">${cls}</span>
+                        <span class="result-item-score">${probs[cls]}%</span>
+                    `;
+                    patientRiskProbabilities.appendChild(item);
+                });
+
+                patientRiskResults.style.display = 'block';
+            } catch (err) {
+                patientRiskError.textContent = `Error: ${err.message}`;
+                patientRiskError.style.display = 'block';
+            } finally {
+                patientRiskLoading.style.display = 'none';
+                runPatientRiskBtn.disabled = false;
+            }
+        });
     </script>
+    <script src="microplastics.js"></script>
 </body>
 </html>
