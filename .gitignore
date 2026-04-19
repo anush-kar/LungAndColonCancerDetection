@@ -1,1 +1,47 @@
 .env
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Test and coverage artifacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Type checker / linter caches
+.mypy_cache/
+.ruff_cache/
+.pyre/
+
+# Build and packaging outputs
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Flask / app runtime artifacts
+uploads/*
+!uploads/.gitkeep
+
+# Logs and local runtime files
+*.log
+*.pid
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
