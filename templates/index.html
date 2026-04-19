@@ -8,7 +8,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🔬 Cancer Detection System</h1>
+        <h1>Cancer Detection System</h1>
         <p class="subtitle">AI-Powered Lung Cancer Analysis</p>
 
         <form id="predictionForm">
@@ -30,7 +30,7 @@
                     <div class="upload-text">
                         <strong>Click to upload</strong> or drag and drop
                     </div>
-                    <div class="upload-text" style="font-size: 12px; color: #999;">
+                    <div class="upload-text upload-note">
                         PNG, JPG, JPEG, BMP, TIFF (Max 16MB)
                     </div>
                     <input type="file" id="fileInput" name="file" accept=".png,.jpg,.jpeg,.bmp,.tiff" onchange="loadFile(event)">
@@ -92,11 +92,12 @@
                 <select id="stationSelect" class="patient-input" required>
                     <option value="">Loading stations...</option>
                 </select>
+                <input id="stationQuery" type="text" class="patient-input" placeholder="Or enter station query manually (e.g., Delhi)" autocomplete="off" />
             </div>
         </div>
 
         <div class="aqi-container">
-            <div class="aqi-title">🌫️ Air Quality by Locality (Powered by World Air Quality Index)</div>
+            <div class="aqi-title">Air Quality by Locality (Powered by World Air Quality Index)</div>
             <button type="button" class="btn" id="fetchAqiBtn" style="margin-top:0;">Fetch Air Quality</button>
             <div class="loading" id="aqiLoading" style="display:none; padding:12px 0 0 0;">
                 <p>Fetching air quality data...</p>
@@ -104,13 +105,15 @@
             <div class="error" id="aqiError" style="display:none;"></div>
             <div id="aqiResults" style="display:none; margin-top:14px;">
                 <div class="aqi-meta" id="aqiMeta"></div>
+                <div class="aqi-time" id="aqiTime"></div>
+                <div class="aqi-advisory" id="aqiAdvisory" style="display:none;"></div>
                 <div class="aqi-grid" id="aqiGrid"></div>
-                <pre class="aqi-json" id="aqiJson"></pre>
+                <div class="aqi-forecast" id="aqiForecast"></div>
             </div>
         </div>
 
         <div class="aqi-container" id="microplasticsSection">
-            <div class="aqi-title">📈 Live WAQI Correlation Analysis</div>
+            <div class="aqi-title">Live WAQI Correlation Analysis</div>
             <p class="subtitle" style="margin-bottom:12px; text-align:left;">
                 Select a region and gender to inspect context, then compute correlation between regional lung cancer incidence and live WAQI metrics.
                 The selected region is highlighted while correlation is calculated across all valid matched regions.
@@ -159,7 +162,7 @@
         </div>
 
         <div class="aqi-container" id="patientRiskSection">
-            <div class="aqi-title">🩺 Patient Lung Cancer Risk (6 Inputs)</div>
+            <div class="aqi-title">Patient Lung Cancer Risk (6 Inputs)</div>
             <p class="subtitle" style="margin-bottom:12px; text-align:left;">
                 Enter patient factors to predict <strong>Level</strong> and numeric <strong>Risk %</strong>.
             </p>
@@ -246,10 +249,13 @@
         const aqiError = document.getElementById('aqiError');
         const aqiResults = document.getElementById('aqiResults');
         const aqiMeta = document.getElementById('aqiMeta');
+        const aqiTime = document.getElementById('aqiTime');
+        const aqiAdvisory = document.getElementById('aqiAdvisory');
         const aqiGrid = document.getElementById('aqiGrid');
-        const aqiJson = document.getElementById('aqiJson');
+        const aqiForecast = document.getElementById('aqiForecast');
         const stationSearch = document.getElementById('stationSearch');
         const stationSelect = document.getElementById('stationSelect');
+        const stationQuery = document.getElementById('stationQuery');
         const runPatientRiskBtn = document.getElementById('runPatientRiskBtn');
         const patientRiskLoading = document.getElementById('patientRiskLoading');
         const patientRiskError = document.getElementById('patientRiskError');
@@ -347,14 +353,141 @@
             }
         });
 
-        function addAqiItem(label, value) {
+        function addAqiItem(label, value, extraClass = '') {
             const item = document.createElement('div');
-            item.className = 'aqi-chip';
+            item.className = `aqi-chip ${extraClass}`.trim();
             item.innerHTML = `
                 <div class="aqi-chip-label">${label}</div>
                 <div class="aqi-chip-value">${value ?? 'N/A'}</div>
             `;
             aqiGrid.appendChild(item);
+        }
+
+        function getAqiClassification(rawAqi) {
+            const aqi = Number(rawAqi);
+            if (!Number.isFinite(aqi)) {
+                return null;
+            }
+
+            if (aqi <= 50) {
+                return {
+                    level: 'Good',
+                    colorClass: 'aqi-level-good',
+                    health: 'Air quality is considered satisfactory, and air pollution poses little or no risk.',
+                    caution: 'None',
+                };
+            }
+            if (aqi <= 100) {
+                return {
+                    level: 'Moderate',
+                    colorClass: 'aqi-level-moderate',
+                    health: 'Air quality is acceptable; however, for some pollutants there may be a moderate health concern for a very small number of people who are unusually sensitive to air pollution.',
+                    caution: 'Active children and adults, and people with respiratory disease, such as asthma, should limit prolonged outdoor exertion.',
+                };
+            }
+            if (aqi <= 150) {
+                return {
+                    level: 'Unhealthy for Sensitive Groups',
+                    colorClass: 'aqi-level-usg',
+                    health: 'Members of sensitive groups may experience health effects. The general public is not likely to be affected.',
+                    caution: 'Active children and adults, and people with respiratory disease, such as asthma, should limit prolonged outdoor exertion.',
+                };
+            }
+            if (aqi <= 200) {
+                return {
+                    level: 'Unhealthy',
+                    colorClass: 'aqi-level-unhealthy',
+                    health: 'Everyone may begin to experience health effects; members of sensitive groups may experience more serious health effects.',
+                    caution: 'Active children and adults, and people with respiratory disease, such as asthma, should avoid prolonged outdoor exertion; everyone else, especially children, should limit prolonged outdoor exertion.',
+                };
+            }
+            if (aqi <= 300) {
+                return {
+                    level: 'Very Unhealthy',
+                    colorClass: 'aqi-level-very-unhealthy',
+                    health: 'Health warnings of emergency conditions. The entire population is more likely to be affected.',
+                    caution: 'Active children and adults, and people with respiratory disease, such as asthma, should avoid all outdoor exertion; everyone else, especially children, should limit outdoor exertion.',
+                };
+            }
+
+            return {
+                level: 'Hazardous',
+                colorClass: 'aqi-level-hazardous',
+                health: 'Health alert: everyone may experience more serious health effects.',
+                caution: 'Everyone should avoid all outdoor exertion.',
+            };
+        }
+
+        function renderAqiAdvisory(classification) {
+            if (!classification) {
+                aqiAdvisory.style.display = 'none';
+                aqiAdvisory.innerHTML = '';
+                return;
+            }
+
+            aqiAdvisory.className = `aqi-advisory ${classification.colorClass}`;
+            aqiAdvisory.innerHTML = `
+                <div class="aqi-advisory-title">Air Pollution Level: ${classification.level}</div>
+                <div><strong>Health Implications:</strong> ${classification.health}</div>
+                <div><strong>Cautionary Statement (PM2.5):</strong> ${classification.caution}</div>
+            `;
+            aqiAdvisory.style.display = 'block';
+        }
+
+        function forecastCell(entry) {
+            if (!entry) {
+                return 'N/A';
+            }
+
+            const avg = entry.avg ?? 'N/A';
+            const min = entry.min ?? 'N/A';
+            const max = entry.max ?? 'N/A';
+            return `avg: ${avg}, min: ${min}, max: ${max}`;
+        }
+
+        function renderDailyForecast(dailyForecast) {
+            const pm25Series = Array.isArray(dailyForecast?.pm25) ? dailyForecast.pm25 : [];
+            const pm10Series = Array.isArray(dailyForecast?.pm10) ? dailyForecast.pm10 : [];
+
+            if (pm25Series.length === 0 && pm10Series.length === 0) {
+                aqiForecast.innerHTML = '<div class="aqi-forecast-title">Daily Forecast (PM2.5 / PM10)</div><div class="aqi-forecast-empty">No daily forecast available.</div>';
+                return;
+            }
+
+            const pm25ByDay = new Map(pm25Series.map((entry) => [entry.day, entry]));
+            const pm10ByDay = new Map(pm10Series.map((entry) => [entry.day, entry]));
+
+            const allDays = Array.from(new Set([...pm25ByDay.keys(), ...pm10ByDay.keys()]))
+                .filter(Boolean)
+                .sort();
+
+            const rows = allDays.map((day) => {
+                return `
+                    <tr>
+                        <td>${day}</td>
+                        <td>${forecastCell(pm25ByDay.get(day))}</td>
+                        <td>${forecastCell(pm10ByDay.get(day))}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            aqiForecast.innerHTML = `
+                <div class="aqi-forecast-title">Daily Forecast (PM2.5 / PM10)</div>
+                <div class="aqi-forecast-table-wrap">
+                    <table class="aqi-forecast-table">
+                        <thead>
+                            <tr>
+                                <th>Day</th>
+                                <th>PM2.5</th>
+                                <th>PM10</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows}
+                        </tbody>
+                    </table>
+                </div>
+            `;
         }
 
         let allStations = [];
@@ -409,14 +542,20 @@
         loadStations();
 
         fetchAqiBtn.addEventListener('click', async () => {
+            const manualQuery = stationQuery.value ? stationQuery.value.trim() : '';
             const selectedStation = stationSelect.value ? stationSelect.value.trim() : '';
+            const stationToQuery = manualQuery || selectedStation;
 
             aqiError.style.display = 'none';
             aqiResults.style.display = 'none';
             aqiGrid.innerHTML = '';
+            aqiTime.innerHTML = '';
+            aqiAdvisory.style.display = 'none';
+            aqiAdvisory.innerHTML = '';
+            aqiForecast.innerHTML = '';
 
-            if (!selectedStation) {
-                aqiError.textContent = 'Please select a station first.';
+            if (!stationToQuery) {
+                aqiError.textContent = 'Please select a station or enter a station query.';
                 aqiError.style.display = 'block';
                 return;
             }
@@ -425,7 +564,7 @@
             fetchAqiBtn.disabled = true;
 
             try {
-                const response = await fetch(`/api/air-quality?station=${encodeURIComponent(selectedStation)}`);
+                const response = await fetch(`/api/air-quality?station=${encodeURIComponent(stationToQuery)}`);
                 const payload = await response.json();
 
                 if (!response.ok || !payload.success) {
@@ -434,15 +573,18 @@
 
                 const data = payload.data || {};
                 const iaqi = data.iaqi || {};
+                const dailyForecast = data.forecast?.daily || {};
+                const aqiClassification = getAqiClassification(data.aqi);
 
                 aqiMeta.innerHTML = `
-                    <strong>Station:</strong> ${selectedStation}<br>
+                    <strong>Station Query:</strong> ${stationToQuery}<br>
                     <strong>Location:</strong> ${data.city?.name || 'N/A'}<br>
-                    <strong>Updated:</strong> ${data.time?.s || 'N/A'}<br>
-                    <strong>Primary Pollutant:</strong> ${data.dominentpol || 'N/A'}
+                    <strong>Dominant Pollutant:</strong> ${data.dominentpol || 'N/A'}
                 `;
 
-                addAqiItem('AQI', data.aqi);
+                aqiTime.innerHTML = `<strong>Date and Time Updated: </strong> ${data.time?.s || 'N/A'}`;
+
+                addAqiItem('AQI', data.aqi, aqiClassification ? aqiClassification.colorClass : '');
                 addAqiItem('PM2.5', iaqi.pm25?.v);
                 addAqiItem('PM10', iaqi.pm10?.v);
                 addAqiItem('O3', iaqi.o3?.v);
@@ -454,7 +596,9 @@
                 addAqiItem('Pressure', iaqi.p?.v);
                 addAqiItem('Wind', iaqi.w?.v);
 
-                aqiJson.textContent = JSON.stringify(data, null, 2);
+                renderAqiAdvisory(aqiClassification);
+                renderDailyForecast(dailyForecast);
+
                 aqiResults.style.display = 'block';
             } catch (err) {
                 aqiError.textContent = `Error: ${err.message}`;
