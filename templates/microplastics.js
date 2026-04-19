@@ -2,22 +2,20 @@
   const microSection = document.getElementById("microplasticsSection");
   if (!microSection) return;
 
-  const exposureBtn = document.getElementById("fetchExposureBtn");
   const correlationBtn = document.getElementById("runCorrelationBtn");
-  const riskBtn = document.getElementById("runEnhancedRiskBtn");
 
   const microError = document.getElementById("microError");
-  const exposureContainer = document.getElementById("microExposure");
   const correlationContainer = document.getElementById("microCorrelation");
-  const riskContainer = document.getElementById("microRisk");
 
-  const exposureGrid = document.getElementById("microExposureGrid");
   const correlationMeta = document.getElementById("microCorrelationMeta");
-  const riskMeta = document.getElementById("microRiskMeta");
   const correlationCanvas = document.getElementById("microCorrelationChart");
 
-  const cancerTypeSelect = document.getElementById("microCancerType");
+  const modeSelect = document.getElementById("microMode");
   const correlationMethodSelect = document.getElementById("microMethod");
+  const stationLimitInput = document.getElementById("microStationLimit");
+  const incidenceRegionSelect = document.getElementById("incidenceRegion");
+  const incidenceGenderSelect = document.getElementById("incidenceGender");
+  const incidenceMetricSelect = document.getElementById("incidenceMetric");
 
   async function requestJson(url, options = {}) {
     const response = await fetch(url, options);
@@ -33,33 +31,7 @@
     microError.style.display = message ? "block" : "none";
   }
 
-  function selectedRegion() {
-    const stationSelect = document.getElementById("stationSelect");
-    const station = stationSelect?.value?.trim();
-    if (station) {
-      const parts = station.split(",");
-      // Typical format: "Station, City, India" => use city for region matching.
-      if (parts.length >= 2) {
-        return parts[1].trim();
-      }
-      return station;
-    }
-
-    const legacyCitySelect = document.getElementById("state");
-    return legacyCitySelect?.value?.trim() || "";
-  }
-
-  function addExposureItem(label, value) {
-    const item = document.createElement("div");
-    item.className = "aqi-chip";
-    item.innerHTML = `
-      <div class="aqi-chip-label">${label}</div>
-      <div class="aqi-chip-value">${value ?? "N/A"}</div>
-    `;
-    exposureGrid.appendChild(item);
-  }
-
-  function drawCorrelationChart(points, trendline) {
+  function drawCorrelationChart(points, trendline, xLabel, yLabel) {
     if (!correlationCanvas) return;
 
     const ctx = correlationCanvas.getContext("2d");
@@ -118,11 +90,11 @@
 
     ctx.fillStyle = "#666";
     ctx.font = "12px Segoe UI";
-    ctx.fillText("Microplastics in Air", width / 2 - 45, height - 10);
+    ctx.fillText(xLabel || "X", width / 2 - 45, height - 10);
     ctx.save();
     ctx.translate(14, height / 2 + 30);
     ctx.rotate(-Math.PI / 2);
-    ctx.fillText("Cancer Incidence", 0, 0);
+    ctx.fillText(yLabel || "Y", 0, 0);
     ctx.restore();
 
     if (trendline && trendline.slope != null && trendline.intercept != null) {
@@ -139,109 +111,87 @@
     points.forEach((p) => {
       const px = xToPx(p.x);
       const py = yToPx(p.y);
-      ctx.fillStyle = "#4f46e5";
+      const isSelected = Boolean(p.is_selected);
+      ctx.fillStyle = isSelected ? "#e85d04" : "#4f46e5";
       ctx.beginPath();
-      ctx.arc(px, py, 4, 0, Math.PI * 2);
+      ctx.arc(px, py, isSelected ? 6 : 4, 0, Math.PI * 2);
       ctx.fill();
     });
   }
 
-  exposureBtn.addEventListener("click", async () => {
-    const region = selectedRegion();
-    setError("");
-    exposureContainer.style.display = "none";
-    if (!region) {
-      setError("Please select a city/locality first.");
-      return;
-    }
-
+  async function loadIncidenceMetadata() {
     try {
-      const payload = await requestJson(`/api/microplastics/exposure?region=${encodeURIComponent(region)}`);
-      const data = payload.data;
-      exposureGrid.innerHTML = "";
-      addExposureItem("Region", data.region);
-      addExposureItem("Year", data.year);
-      addExposureItem("Microplastics (air)", data.microplastics_air);
-      addExposureItem("PM2.5", data.pm25);
-      addExposureItem("PM10", data.pm10);
-      addExposureItem("Lung ACA incidence", data.lung_aca_incidence);
-      addExposureItem("Lung SCC incidence", data.lung_scc_incidence);
-      exposureContainer.style.display = "block";
+      const payload = await requestJson("/api/incidence-waqi/metadata");
+      const regions = Array.isArray(payload?.data?.regions) ? payload.data.regions : [];
+
+      incidenceRegionSelect.innerHTML = "";
+      regions.forEach((region) => {
+        const option = document.createElement("option");
+        option.value = region;
+        option.textContent = region;
+        incidenceRegionSelect.appendChild(option);
+      });
+
+      if (regions.length === 0) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "No incidence regions found";
+        incidenceRegionSelect.appendChild(option);
+      }
     } catch (err) {
-      setError(err.message);
+      setError(`Failed to load incidence metadata: ${err.message}`);
+      incidenceRegionSelect.innerHTML = '<option value="">Metadata unavailable</option>';
     }
-  });
+  }
 
   correlationBtn.addEventListener("click", async () => {
     setError("");
     correlationContainer.style.display = "none";
 
+    const parsedLimit = Number.parseInt(stationLimitInput?.value || "4", 10);
+    const station_limit = Number.isFinite(parsedLimit) ? Math.min(8, Math.max(1, parsedLimit)) : 4;
+
     try {
-      const payload = await requestJson("/api/microplastics/correlation", {
+      const payload = await requestJson("/api/incidence-waqi/correlation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          cancer_type: cancerTypeSelect.value,
+          region: incidenceRegionSelect?.value || "",
+          gender: incidenceGenderSelect?.value || "combined",
+          incidence_metric: incidenceMetricSelect?.value || "aar",
+          waqi_mode: modeSelect.value,
           method: correlationMethodSelect.value,
+          station_limit,
         }),
       });
 
       const c = payload.correlation;
       const strength = payload.interpretation?.strength || "N/A";
+      const coverage = payload.coverage || {};
+      const selected = payload.selected_region_point;
+      const selectedText = selected
+        ? `${selected.region} -> X=${selected.x.toFixed(2)}, Y=${selected.y.toFixed(2)}, Stations=${selected.station_count}`
+        : `${c.selected_region || "N/A"} not matched in valid point set`;
+
       correlationMeta.innerHTML = `
+        <strong>Selected Region:</strong> ${selectedText}<br>
         <strong>Method:</strong> ${c.method}<br>
+        <strong>X Metric:</strong> ${c.x_metric}<br>
+        <strong>Y Metric:</strong> ${c.y_metric}<br>
+        <strong>Coverage:</strong> ${coverage.regions_used}/${coverage.regions_total} regions<br>
+        <strong>Skipped (no station match):</strong> ${coverage.skipped_no_station_match ?? 0}<br>
+        <strong>Skipped (missing data):</strong> ${coverage.skipped_missing_data ?? 0}<br>
         <strong>Sample Size:</strong> ${c.n}<br>
         <strong>Correlation (r):</strong> ${c.r}<br>
         <strong>P-Value:</strong> ${c.p_value ?? "N/A"}<br>
         <strong>Strength:</strong> ${strength}
       `;
-      drawCorrelationChart(payload.points || [], c.trendline || null);
+      drawCorrelationChart(payload.points || [], c.trendline || null, c.x_metric, c.y_metric);
       correlationContainer.style.display = "block";
     } catch (err) {
       setError(err.message);
     }
   });
 
-  riskBtn.addEventListener("click", async () => {
-    const region = selectedRegion();
-    setError("");
-    riskContainer.style.display = "none";
-
-    if (!region) {
-      setError("Please select a city/locality first.");
-      return;
-    }
-
-    const predictedScore = window.latestImagePrediction?.score;
-    if (predictedScore == null) {
-      setError("Run image analysis first, then generate enhanced risk.");
-      return;
-    }
-
-    try {
-      const payload = await requestJson("/api/risk/enhanced", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          region,
-          image_score: predictedScore,
-          cancer_type: cancerTypeSelect.value,
-        }),
-      });
-
-      const r = payload.risk;
-      const factors = (r.explanation || []).map((f) => `<li>${f}</li>`).join("");
-      riskMeta.innerHTML = `
-        <strong>Image Risk:</strong> ${(r.base_image_risk * 100).toFixed(1)}%<br>
-        <strong>Environmental Index:</strong> ${(r.environmental_index * 100).toFixed(1)}%<br>
-        <strong>Combined Risk:</strong> ${(r.combined_risk * 100).toFixed(1)}%<br>
-        <strong>Risk Tier:</strong> ${r.risk_tier}<br>
-        <strong>Uncertainty:</strong> ±${(r.uncertainty * 100).toFixed(1)}%
-        <ul style="margin-top:8px; padding-left:18px;">${factors}</ul>
-      `;
-      riskContainer.style.display = "block";
-    } catch (err) {
-      setError(err.message);
-    }
-  });
+  loadIncidenceMetadata();
 })();

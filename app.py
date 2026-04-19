@@ -10,6 +10,8 @@ from transformers import pipeline
 from PIL import Image
 import os
 import json
+import csv
+import re
 from urllib.parse import quote
 from urllib.request import urlopen
 from urllib.error import URLError, HTTPError
@@ -35,13 +37,14 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'bmp', 'tiff'}
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
-MICROPLASTICS_DATA_FILE = os.path.join(DATA_DIR, 'microplastics_regions.json')
 WAQI_STATIONS_FILE = os.path.join(DATA_DIR, 'waqi_stations_india.txt')
+NCRP_INCIDENCE_FILE = os.path.join(DATA_DIR, 'ncrp_lung_cancer_incidence.csv')
 RISK_MODEL_ARTIFACT = os.path.join('models', 'patient_risk_selected_features.pkl')
 RISK_DATASET_FILE = os.path.join('data', 'cancer patient data sets.csv')
 
 _risk_model_artifact_cache = None
 _image_model_cache = None
+_incidence_records_cache = None
 
 # Create uploads directory if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -57,7 +60,8 @@ def get_image_model():
     _image_model_cache = pipeline(
         "image-classification",
         model="DunnBC22/vit-base-patch16-224-in21k_lung_and_colon_cancer",
-        device=0 if torch.cuda.is_available() else -1,
+        # device=0 if torch.cuda.is_available() else -1,
+        device=-1,
         use_fast=True,
     )
     print("Model loaded successfully!")
@@ -77,49 +81,11 @@ def format_label(label):
     }
     return label_map.get(label, label)
 
-def load_microplastics_data():
-    if not os.path.exists(MICROPLASTICS_DATA_FILE):
-        return []
-
-    with open(MICROPLASTICS_DATA_FILE, 'r', encoding='utf-8') as f:
-        payload = json.load(f)
-
-    return payload if isinstance(payload, list) else []
-
-def find_region_record(region):
-    records = load_microplastics_data()
-    if not records:
+def to_float(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
         return None
-
-    region_l = region.lower().strip()
-    exact = [r for r in records if str(r.get('region', '')).lower().strip() == region_l]
-    if exact:
-        return sorted(exact, key=lambda x: x.get('year', 0), reverse=True)[0]
-
-    partial = [r for r in records if region_l in str(r.get('region', '')).lower()]
-    if partial:
-        return sorted(partial, key=lambda x: x.get('year', 0), reverse=True)[0]
-
-    return None
-
-def get_incidence_value(record, cancer_type):
-    ct = (cancer_type or 'combined').lower()
-    aca = float(record.get('lung_aca_incidence', 0))
-    scc = float(record.get('lung_scc_incidence', 0))
-
-    if ct in {'aca', 'lung_aca', 'adenocarcinoma'}:
-        return aca
-    if ct in {'scc', 'lung_scc', 'squamous'}:
-        return scc
-    return (aca + scc) / 2.0
-
-def clamp01(value):
-    return max(0.0, min(1.0, value))
-
-def normalize_value(value, low, high):
-    if high <= low:
-        return 0.0
-    return clamp01((value - low) / (high - low))
 
 def correlation_strength(abs_r):
     if abs_r >= 0.8:
@@ -220,6 +186,150 @@ def get_patient_risk_model_artifact():
     )
     return _risk_model_artifact_cache
 
+def normalize_text(value):
+    text = str(value or '').lower().strip()
+    text = re.sub(r'[^a-z0-9]+', ' ', text)
+    return re.sub(r'\s+', ' ', text).strip()
+
+def tokenize_region_name(region):
+    clean = normalize_text(region)
+    noise = {
+        'district', 'state', 'urban', 'rural', 'and', 'west', 'east',
+        'north', 'south', 'upper', 'lower'
+    }
+    tokens = [t for t in clean.split(' ') if t and t not in noise and len(t) >= 4]
+    return list(dict.fromkeys(tokens))
+
+def load_incidence_records():
+    global _incidence_records_cache
+
+    if _incidence_records_cache is not None:
+        return _incidence_records_cache
+
+    if not os.path.exists(NCRP_INCIDENCE_FILE):
+        _incidence_records_cache = []
+        return _incidence_records_cache
+
+    records = []
+    with open(NCRP_INCIDENCE_FILE, 'r', encoding='utf-8-sig', newline='') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            region = (row.get('PBCR') or '').strip()
+            if not region:
+                continue
+
+            record = {
+                'region': region,
+                'region_norm': normalize_text(region),
+                'region_tokens': tokenize_region_name(region),
+                'male': {
+                    'aar': to_float(row.get('Male_AAR')),
+                    'cr': to_float(row.get('Male_CR')),
+                    'incidence_n': to_float(row.get('Male_Incidence_n')),
+                },
+                'female': {
+                    'aar': to_float(row.get('Female_AAR')),
+                    'cr': to_float(row.get('Female_CR')),
+                    'incidence_n': to_float(row.get('Female_Incidence_n')),
+                },
+            }
+            records.append(record)
+
+    _incidence_records_cache = records
+    return _incidence_records_cache
+
+def get_incidence_value_for_record(record, metric, gender):
+    metric_key = (metric or 'aar').lower()
+    gender_key = (gender or 'combined').lower()
+
+    if metric_key not in {'aar', 'cr', 'incidence_n'}:
+        raise ValueError('incidence_metric must be aar, cr, or incidence_n')
+    if gender_key not in {'male', 'female', 'combined'}:
+        raise ValueError('gender must be male, female, or combined')
+
+    male_val = record.get('male', {}).get(metric_key)
+    female_val = record.get('female', {}).get(metric_key)
+
+    if gender_key == 'male':
+        return male_val
+    if gender_key == 'female':
+        return female_val
+
+    vals = [v for v in [male_val, female_val] if v is not None]
+    if not vals:
+        return None
+    return float(sum(vals) / len(vals))
+
+def find_incidence_region_record(region):
+    query = normalize_text(region)
+    for rec in load_incidence_records():
+        if rec.get('region_norm') == query:
+            return rec
+
+    for rec in load_incidence_records():
+        if query and query in rec.get('region_norm', ''):
+            return rec
+    return None
+
+def find_region_stations(region, stations):
+    region_norm = normalize_text(region)
+    region_tokens = tokenize_region_name(region)
+    matches = []
+
+    for station in stations:
+        station_norm = normalize_text(station)
+        if not station_norm:
+            continue
+
+        if region_norm and (region_norm in station_norm or station_norm in region_norm):
+            matches.append(station)
+            continue
+
+        station_parts = [normalize_text(p) for p in str(station).split(',') if p.strip()]
+        station_tokens = []
+        for part in station_parts:
+            station_tokens.extend([t for t in part.split(' ') if t])
+        station_tokens = set(station_tokens)
+
+        if any(token in station_tokens for token in region_tokens):
+            matches.append(station)
+
+    return list(dict.fromkeys(matches))
+
+def aggregate_region_waqi(stations, station_cache, waqi_mode, per_region_station_limit):
+    chosen = stations[:per_region_station_limit]
+    metric_vals = []
+    used_stations = []
+
+    for station in chosen:
+        if station not in station_cache:
+            try:
+                data = fetch_waqi_feed(station)
+                iaqi = data.get('iaqi', {}) or {}
+                station_cache[station] = {
+                    'aqi': to_float(data.get('aqi')),
+                    'pm25': to_float((iaqi.get('pm25') or {}).get('v')),
+                    'pm10': to_float((iaqi.get('pm10') or {}).get('v')),
+                }
+            except Exception:
+                station_cache[station] = None
+
+        snapshot = station_cache.get(station)
+        if not snapshot:
+            continue
+
+        value = snapshot.get(waqi_mode)
+        if value is None:
+            continue
+
+        metric_vals.append(value)
+        used_stations.append(station)
+
+    if not metric_vals:
+        return None, []
+
+    return float(sum(metric_vals) / len(metric_vals)), used_stations
+
 def load_waqi_stations():
     if not os.path.exists(WAQI_STATIONS_FILE):
         return []
@@ -234,6 +344,73 @@ def load_waqi_stations():
     # Preserve order, remove duplicates
     deduped = list(dict.fromkeys(stations))
     return deduped
+
+def fetch_waqi_feed(query):
+    token = WAQI_API_TOKEN or os.environ.get('WAQI_API_TOKEN') or 'demo'
+    waqi_url = f"https://api.waqi.info/feed/{quote(query)}/?token={token}"
+
+    with urlopen(waqi_url, timeout=10) as response:
+        payload = json.loads(response.read().decode('utf-8'))
+
+    if payload.get('status') != 'ok':
+        data = payload.get('data')
+        message = data if isinstance(data, str) else 'Unable to fetch data from WAQI API'
+        raise ValueError(message)
+
+    return payload.get('data', {})
+
+def collect_waqi_snapshots(stations, limit):
+    samples = []
+    for station in stations[:limit]:
+        try:
+            data = fetch_waqi_feed(station)
+        except Exception:
+            continue
+
+        iaqi = data.get('iaqi', {}) or {}
+        row = {
+            'station': station,
+            'aqi': to_float(data.get('aqi')),
+            'pm25': to_float((iaqi.get('pm25') or {}).get('v')),
+            'pm10': to_float((iaqi.get('pm10') or {}).get('v')),
+        }
+        samples.append(row)
+
+    return samples
+
+def build_waqi_mode_vectors(samples, mode):
+    vectors = []
+    for row in samples:
+        aqi = row.get('aqi')
+        pm25 = row.get('pm25')
+        pm10 = row.get('pm10')
+
+        if mode == 'pm25':
+            x_val = pm25
+            y_val = aqi
+            x_label = 'PM2.5'
+            y_label = 'WAQI AQI'
+        elif mode == 'pm10':
+            x_val = pm10
+            y_val = aqi
+            x_label = 'PM10'
+            y_label = 'WAQI AQI'
+        else:
+            x_val = pm25
+            y_val = pm10
+            x_label = 'PM2.5'
+            y_label = 'PM10'
+
+        if x_val is None or y_val is None:
+            continue
+
+        vectors.append({
+            'station': row.get('station'),
+            'x': x_val,
+            'y': y_val,
+        })
+
+    return vectors, x_label, y_label
 
 @app.route('/')
 def index():
@@ -270,84 +447,228 @@ def get_air_quality():
     if not query:
         return jsonify({'error': 'Station name is required'}), 400
 
-    token = WAQI_API_TOKEN or os.environ.get('WAQI_API_TOKEN') or 'demo'
-    waqi_url = f"https://api.waqi.info/feed/{quote(query)}/?token={token}"
-
     try:
-        with urlopen(waqi_url, timeout=10) as response:
-            payload = json.loads(response.read().decode('utf-8'))
+        data = fetch_waqi_feed(query)
+        return jsonify({'success': True, 'data': data})
 
-        if payload.get('status') != 'ok':
-            return jsonify({
-                'error': payload.get('data', 'Unable to fetch air quality data from WAQI')
-            }), 400
-
-        return jsonify({'success': True, 'data': payload.get('data', {})})
-
+    except ValueError as ex:
+        return jsonify({'error': str(ex)}), 400
     except (HTTPError, URLError):
         return jsonify({'error': 'Failed to connect to WAQI API'}), 502
     except Exception as e:
         return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
 
-@app.route('/api/microplastics/metadata', methods=['GET'])
-def microplastics_metadata():
-    records = load_microplastics_data()
-    regions = sorted({r.get('region') for r in records if r.get('region')})
-    years = sorted({r.get('year') for r in records if r.get('year')})
+@app.route('/api/waqi/correlation/metadata', methods=['GET'])
+def waqi_correlation_metadata():
+    stations = load_waqi_stations()
     return jsonify({
         'success': True,
         'data': {
-            'data_source': 'Regional environmental + epidemiological baseline dataset',
-            'record_count': len(records),
-            'regions': regions,
-            'years': years,
-            'supported_cancer_types': ['combined', 'lung_aca', 'lung_scc'],
-            'supported_methods': ['pearson', 'spearman']
+            'data_source': 'Live WAQI station feed',
+            'station_count': len(stations),
+            'supported_modes': ['pm25', 'pm10', 'waqi_aqi'],
+            'supported_methods': ['pearson', 'spearman'],
         }
     })
 
-@app.route('/api/microplastics/exposure', methods=['GET'])
-def get_microplastics_exposure():
-    region = request.args.get('region', '').strip()
-    if not region:
-        return jsonify({'error': 'Region is required'}), 400
+@app.route('/api/incidence-waqi/metadata', methods=['GET'])
+def incidence_waqi_metadata():
+    records = load_incidence_records()
+    stations = load_waqi_stations()
+    return jsonify({
+        'success': True,
+        'data': {
+            'region_count': len(records),
+            'regions': sorted([r.get('region') for r in records]),
+            'gender_options': ['male', 'female', 'combined'],
+            'incidence_metric_options': ['aar', 'cr', 'incidence_n'],
+            'waqi_metric_options': ['aqi', 'pm25', 'pm10'],
+            'supported_methods': ['pearson', 'spearman'],
+            'station_count': len(stations),
+            'stations': stations,
+        }
+    })
 
-    record = find_region_record(region)
-    if not record:
-        return jsonify({'error': f'No microplastics dataset found for region: {region}'}), 404
-
-    return jsonify({'success': True, 'data': record})
-
-@app.route('/api/microplastics/correlation', methods=['POST'])
-def microplastics_correlation():
+@app.route('/api/incidence-waqi/correlation', methods=['POST'])
+def incidence_waqi_correlation():
     payload = request.get_json(silent=True) or {}
-    cancer_type = payload.get('cancer_type', 'combined')
-    method = payload.get('method', 'pearson').lower()
 
+    selected_region = (payload.get('region') or '').strip()
+    gender = (payload.get('gender') or 'combined').lower()
+    incidence_metric = (payload.get('incidence_metric') or 'aar').lower()
+    waqi_mode = (payload.get('waqi_mode') or 'aqi').lower()
+    method = (payload.get('method') or 'pearson').lower()
+    requested_stations = payload.get('stations')
+
+    per_region_station_limit = int(payload.get('station_limit', 4) or 4)
+    per_region_station_limit = max(1, min(8, per_region_station_limit))
+
+    if gender not in {'male', 'female', 'combined'}:
+        return jsonify({'error': 'gender must be male, female, or combined'}), 400
+    if incidence_metric not in {'aar', 'cr', 'incidence_n'}:
+        return jsonify({'error': 'incidence_metric must be aar, cr, or incidence_n'}), 400
+    if waqi_mode not in {'aqi', 'pm25', 'pm10'}:
+        return jsonify({'error': 'waqi_mode must be aqi, pm25, or pm10'}), 400
     if method not in {'pearson', 'spearman'}:
         return jsonify({'error': 'method must be pearson or spearman'}), 400
 
-    records = load_microplastics_data()
+    records = load_incidence_records()
     if len(records) < 3:
-        return jsonify({'error': 'Insufficient records for correlation analysis'}), 400
+        return jsonify({'error': 'Insufficient incidence records for correlation analysis'}), 400
+
+    if isinstance(requested_stations, list):
+        stations = [str(s).strip() for s in requested_stations if str(s).strip()]
+    else:
+        stations = load_waqi_stations()
+
+    if not stations:
+        return jsonify({'error': 'No WAQI stations are available'}), 400
+
+    station_cache = {}
+    points = []
+    skipped_no_station_match = 0
+    skipped_missing_data = 0
+
+    for rec in records:
+        incidence_value = get_incidence_value_for_record(rec, incidence_metric, gender)
+        if incidence_value is None:
+            skipped_missing_data += 1
+            continue
+
+        region_stations = find_region_stations(rec.get('region'), stations)
+        if not region_stations:
+            skipped_no_station_match += 1
+            continue
+
+        waqi_value, used_stations = aggregate_region_waqi(
+            stations=region_stations,
+            station_cache=station_cache,
+            waqi_mode=waqi_mode,
+            per_region_station_limit=per_region_station_limit,
+        )
+
+        if waqi_value is None:
+            skipped_missing_data += 1
+            continue
+
+        points.append({
+            'region': rec.get('region'),
+            'x': waqi_value,
+            'y': incidence_value,
+            'stations_used': used_stations,
+            'station_count': len(used_stations),
+            'is_selected': normalize_text(rec.get('region')) == normalize_text(selected_region),
+        })
+
+    if len(points) < 3:
+        return jsonify({
+            'error': 'Insufficient valid regional points from live WAQI + incidence data. Try selecting different stations or rerun later.'
+        }), 400
+
+    xs = [p['x'] for p in points]
+    ys = [p['y'] for p in points]
+
+    try:
+        r_value, p_value = compute_correlation(xs, ys, method=method)
+        slope, intercept = linear_fit(xs, ys)
+    except ValueError as ex:
+        return jsonify({'error': str(ex)}), 400
+    except Exception as ex:
+        return jsonify({'error': f'Correlation failed: {str(ex)}'}), 500
+
+    selected_point = None
+    if selected_region:
+        for p in points:
+            if p.get('is_selected'):
+                selected_point = p
+                break
+
+    metric_label_map = {
+        'aar': 'AAR (Age-adjusted rate)',
+        'cr': 'CR (Crude rate)',
+        'incidence_n': 'Incidence Count',
+    }
+    waqi_label_map = {
+        'aqi': 'WAQI AQI',
+        'pm25': 'PM2.5',
+        'pm10': 'PM10',
+    }
+
+    return jsonify({
+        'success': True,
+        'correlation': {
+            'method': method,
+            'r': round(r_value, 4),
+            'p_value': (None if p_value is None else round(p_value, 6)),
+            'n': len(points),
+            'x_metric': waqi_label_map.get(waqi_mode, waqi_mode),
+            'y_metric': f"{metric_label_map.get(incidence_metric, incidence_metric)} ({gender})",
+            'trendline': {
+                'slope': (None if slope is None else round(slope, 6)),
+                'intercept': (None if intercept is None else round(intercept, 6))
+            },
+            'selected_region': selected_region or None,
+            'selected_region_found': selected_point is not None,
+        },
+        'points': points,
+        'selected_region_point': selected_point,
+        'coverage': {
+            'regions_total': len(records),
+            'regions_used': len(points),
+            'skipped_no_station_match': skipped_no_station_match,
+            'skipped_missing_data': skipped_missing_data,
+            'station_limit_per_region': per_region_station_limit,
+        },
+        'interpretation': {
+            'direction': 'positive' if r_value >= 0 else 'negative',
+            'strength': correlation_strength(abs(r_value)),
+            'note': 'Selected region is highlighted for context; correlation is computed across all valid matched regions. Correlation does not imply causation.' if p_value is not None else 'Selected region is highlighted for context; correlation is computed across all valid matched regions. Correlation does not imply causation. p-value unavailable without scipy.'
+        }
+    })
+
+@app.route('/api/waqi/correlation', methods=['POST'])
+def waqi_correlation():
+    payload = request.get_json(silent=True) or {}
+    mode = (payload.get('mode') or 'pm25').lower()
+    method = payload.get('method', 'pearson').lower()
+    limit = int(payload.get('limit', 20) or 20)
+    limit = max(3, min(limit, 40))
+    requested_stations = payload.get('stations')
+
+    if mode not in {'pm25', 'pm10', 'waqi_aqi'}:
+        return jsonify({'error': 'mode must be pm25, pm10, or waqi_aqi'}), 400
+    if method not in {'pearson', 'spearman'}:
+        return jsonify({'error': 'method must be pearson or spearman'}), 400
+
+    if isinstance(requested_stations, list):
+        stations = [str(s).strip() for s in requested_stations if str(s).strip()]
+    else:
+        stations = load_waqi_stations()
+
+    if len(stations) < 3:
+        return jsonify({'error': 'At least 3 stations are required for WAQI correlation.'}), 400
+
+    samples = collect_waqi_snapshots(stations, limit=limit)
+    vectors, x_label, y_label = build_waqi_mode_vectors(samples, mode)
 
     xs = []
     ys = []
     points = []
-    for r in records:
-        micro = r.get('microplastics_air')
-        if micro is None:
-            continue
-        x_val = float(micro)
-        y_val = get_incidence_value(r, cancer_type)
+    for item in vectors:
+        x_val = item['x']
+        y_val = item['y']
         xs.append(x_val)
         ys.append(y_val)
         points.append({
-            'region': r.get('region'),
-            'year': r.get('year'),
+            'station': item.get('station'),
             'x': x_val,
             'y': y_val
         })
+
+    if len(xs) < 3:
+        return jsonify({
+            'error': 'Insufficient valid live WAQI points. Try increasing station limit or choose different stations.'
+        }), 400
 
     try:
         r_value, p_value = compute_correlation(xs, ys, method=method)
@@ -361,10 +682,14 @@ def microplastics_correlation():
         'success': True,
         'correlation': {
             'method': method,
+            'mode': mode,
             'r': round(r_value, 4),
             'p_value': (None if p_value is None else round(p_value, 6)),
             'n': len(xs),
-            'target': cancer_type,
+            'x_metric': x_label,
+            'y_metric': y_label,
+            'stations_requested': min(limit, len(stations)),
+            'stations_used': len(xs),
             'trendline': {
                 'slope': (None if slope is None else round(slope, 6)),
                 'intercept': (None if intercept is None else round(intercept, 6))
@@ -375,75 +700,6 @@ def microplastics_correlation():
             'direction': 'positive' if r_value >= 0 else 'negative',
             'strength': correlation_strength(abs(r_value)),
             'note': 'Correlation does not imply causation.' if p_value is not None else 'Correlation does not imply causation. p-value unavailable without scipy.'
-        }
-    })
-
-@app.route('/api/risk/enhanced', methods=['POST'])
-def enhanced_risk():
-    payload = request.get_json(silent=True) or {}
-    region = (payload.get('region') or '').strip()
-    cancer_type = payload.get('cancer_type', 'combined')
-    image_score = payload.get('image_score', None)
-
-    if not region:
-        return jsonify({'error': 'region is required'}), 400
-    if image_score is None:
-        return jsonify({'error': 'image_score is required'}), 400
-
-    try:
-        image_score = float(image_score)
-    except ValueError:
-        return jsonify({'error': 'image_score must be a number'}), 400
-
-    image_risk = image_score / 100.0 if image_score > 1 else image_score
-    image_risk = clamp01(image_risk)
-
-    record = find_region_record(region)
-    if not record:
-        return jsonify({'error': f'No microplastics dataset found for region: {region}'}), 404
-
-    all_records = load_microplastics_data()
-    micro_values = [float(r.get('microplastics_air', 0)) for r in all_records]
-    pm25_values = [float(r.get('pm25', 0)) for r in all_records]
-
-    micro_norm = normalize_value(float(record.get('microplastics_air', 0)), min(micro_values), max(micro_values))
-    pm25_norm = normalize_value(float(record.get('pm25', 0)), min(pm25_values), max(pm25_values))
-    incidence_norm = normalize_value(get_incidence_value(record, cancer_type),
-                                     min(get_incidence_value(r, cancer_type) for r in all_records),
-                                     max(get_incidence_value(r, cancer_type) for r in all_records))
-
-    environmental_index = clamp01((0.45 * micro_norm) + (0.35 * pm25_norm) + (0.20 * incidence_norm))
-    combined_risk = clamp01((0.70 * image_risk) + (0.30 * environmental_index))
-    uncertainty = clamp01(0.08 + (0.15 * (1 - len(all_records) / max(len(all_records), 20))))
-
-    if combined_risk >= 0.75:
-        tier = 'high'
-    elif combined_risk >= 0.45:
-        tier = 'moderate'
-    else:
-        tier = 'low'
-
-    explanation = [
-        f"Image model contributes {(0.70 * image_risk * 100):.1f} risk points.",
-        f"Environmental exposure contributes {(0.30 * environmental_index * 100):.1f} risk points.",
-        f"Region matched: {record.get('region')} ({record.get('year')}).",
-        "This is a decision-support estimate and not a diagnosis."
-    ]
-
-    return jsonify({
-        'success': True,
-        'risk': {
-            'base_image_risk': round(image_risk, 4),
-            'environmental_index': round(environmental_index, 4),
-            'combined_risk': round(combined_risk, 4),
-            'risk_tier': tier,
-            'uncertainty': round(uncertainty, 4),
-            'explanation': explanation,
-            'region_data': {
-                'microplastics_air': record.get('microplastics_air'),
-                'pm25': record.get('pm25'),
-                'pm10': record.get('pm10')
-            }
         }
     })
 

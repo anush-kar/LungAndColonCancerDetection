@@ -88,7 +88,8 @@
         <div class="section" style="margin-top: 20px;">
             <label for="stationSelect">Station Name</label>
             <div id="city_dropdowns">
-                <select id="stationSelect" class="form-control" required>
+                <input id="stationSearch" type="text" class="patient-input" placeholder="Search station by name" autocomplete="off" />
+                <select id="stationSelect" class="patient-input" required>
                     <option value="">Loading stations...</option>
                 </select>
             </div>
@@ -109,31 +110,42 @@
         </div>
 
         <div class="aqi-container" id="microplasticsSection">
-            <div class="aqi-title">🧪 Microplastics Correlation Analysis</div>
+            <div class="aqi-title">📈 Live WAQI Correlation Analysis</div>
+            <p class="subtitle" style="margin-bottom:12px; text-align:left;">
+                Select a region and gender to inspect context, then compute correlation between regional lung cancer incidence and live WAQI metrics.
+                The selected region is highlighted while correlation is calculated across all valid matched regions.
+            </p>
             <div class="micro-controls">
-                <select id="microCancerType" class="form-control">
-                    <option value="combined">Combined Lung Incidence</option>
-                    <option value="lung_aca">Lung Adenocarcinoma (ACA)</option>
-                    <option value="lung_scc">Lung Squamous Cell Carcinoma (SCC)</option>
+                <select id="incidenceRegion" class="form-control">
+                    <option value="">Loading regions...</option>
+                </select>
+                <select id="incidenceGender" class="form-control">
+                    <option value="combined">Combined</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                </select>
+                <select id="incidenceMetric" class="form-control">
+                    <option value="aar">AAR (Age-adjusted rate)</option>
+                    <option value="cr">CR (Crude rate)</option>
+                    <option value="incidence_n">Incidence Count</option>
+                </select>
+                <select id="microMode" class="form-control">
+                    <option value="aqi">WAQI AQI vs Incidence</option>
+                    <option value="pm25">PM2.5 vs Incidence</option>
+                    <option value="pm10">PM10 vs Incidence</option>
                 </select>
                 <select id="microMethod" class="form-control">
                     <option value="pearson">Pearson correlation</option>
                     <option value="spearman">Spearman correlation</option>
                 </select>
+                <input id="microStationLimit" class="form-control" type="number" min="1" max="8" value="4" placeholder="Stations per region (1-8)" />
             </div>
 
             <div class="micro-action-row">
-                <button type="button" class="btn" id="fetchExposureBtn">Load Region Exposure</button>
-                <button type="button" class="btn" id="runCorrelationBtn">Run Epidemiological Correlation</button>
-                <button type="button" class="btn" id="runEnhancedRiskBtn">Compute Enhanced Risk</button>
+                <button type="button" class="btn" id="runCorrelationBtn">Run Live WAQI Correlation</button>
             </div>
 
             <div class="error" id="microError" style="display:none;"></div>
-
-            <div id="microExposure" style="display:none; margin-top:12px;">
-                <div class="aqi-meta"><strong>Regional Exposure Baseline</strong></div>
-                <div class="aqi-grid" id="microExposureGrid"></div>
-            </div>
 
             <div id="microCorrelation" style="display:none; margin-top:12px;">
                 <div class="aqi-meta"><strong>Correlation Output</strong></div>
@@ -142,13 +154,6 @@
                 </div>
                 <div class="micro-chart-wrap">
                     <canvas id="microCorrelationChart" width="520" height="300"></canvas>
-                </div>
-            </div>
-
-            <div id="microRisk" style="display:none; margin-top:12px;">
-                <div class="aqi-meta"><strong>Enhanced Risk (Image + Environment)</strong></div>
-                <div class="result-item">
-                    <div id="microRiskMeta"></div>
                 </div>
             </div>
         </div>
@@ -243,6 +248,7 @@
         const aqiMeta = document.getElementById('aqiMeta');
         const aqiGrid = document.getElementById('aqiGrid');
         const aqiJson = document.getElementById('aqiJson');
+        const stationSearch = document.getElementById('stationSearch');
         const stationSelect = document.getElementById('stationSelect');
         const runPatientRiskBtn = document.getElementById('runPatientRiskBtn');
         const patientRiskLoading = document.getElementById('patientRiskLoading');
@@ -351,6 +357,36 @@
             aqiGrid.appendChild(item);
         }
 
+        let allStations = [];
+
+        function renderStationOptions(filteredStations, preferredSelection = '') {
+            stationSelect.innerHTML = '<option value="">Select Station Name</option>';
+
+            filteredStations.forEach((station) => {
+                const option = document.createElement('option');
+                option.value = station;
+                option.textContent = station;
+                stationSelect.appendChild(option);
+            });
+
+            if (preferredSelection && filteredStations.includes(preferredSelection)) {
+                stationSelect.value = preferredSelection;
+            }
+        }
+
+        function filterStations() {
+            const query = (stationSearch.value || '').trim().toLowerCase();
+            const currentSelection = stationSelect.value;
+
+            if (!query) {
+                renderStationOptions(allStations, currentSelection);
+                return;
+            }
+
+            const filtered = allStations.filter((station) => station.toLowerCase().includes(query));
+            renderStationOptions(filtered, currentSelection);
+        }
+
         async function loadStations() {
             try {
                 const response = await fetch('/api/waqi-stations');
@@ -360,15 +396,8 @@
                     throw new Error(payload.error || 'Unable to load station list.');
                 }
 
-                const stations = payload.data?.stations || [];
-                stationSelect.innerHTML = '<option value="">Select Station Name</option>';
-
-                stations.forEach((station) => {
-                    const option = document.createElement('option');
-                    option.value = station;
-                    option.textContent = station;
-                    stationSelect.appendChild(option);
-                });
+                allStations = payload.data?.stations || [];
+                renderStationOptions(allStations);
             } catch (err) {
                 stationSelect.innerHTML = '<option value="">Failed to load stations</option>';
                 aqiError.textContent = `Error: ${err.message}`;
@@ -376,6 +405,7 @@
             }
         }
 
+        stationSearch.addEventListener('input', filterStations);
         loadStations();
 
         fetchAqiBtn.addEventListener('click', async () => {

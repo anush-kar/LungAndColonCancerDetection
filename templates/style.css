@@ -285,6 +285,9 @@ input[type="file"] {
 }
 #city_dropdowns {
   margin-top: 20px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
 }
 .aqi-container {
   margin-top: 20px;
